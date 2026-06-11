@@ -151,6 +151,21 @@ function parseDate(v){
 }
 const fmtMonth=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
 const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+// 萬用評分解析:支援 4、4.5、"4星"、"★★★★☆"、"4/5"、"8/10"、"4.5分"、"四星"
+function parseRating(v){
+  if(v==null||v==="")return null;
+  if(typeof v==="number")return isFinite(v)?v:null;
+  const s=String(v).trim();
+  const st=(s.match(/★|⭐/g)||[]).length;
+  if(st>0)return st;
+  let m=s.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)/);
+  if(m){const a=parseFloat(m[1]),b=parseFloat(m[2]);return b>5?a/(b/5):a;}
+  m=s.match(/[一二三四五](?=\s*星)/);
+  if(m)return {"一":1,"二":2,"三":3,"四":4,"五":5}[m[0]];
+  m=s.match(/-?\d+(?:\.\d+)?/);
+  if(m)return parseFloat(m[0]);
+  return null;
+}
 
 function extractKeywords(texts,topN){
   const freq={};
@@ -177,19 +192,22 @@ function detectSchema(data){
   const isDate=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;if(parseDate(v))h++;}return t>0&&h/t>0.7;};
   const isNum=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;if(typeof v==="number"||(!isNaN(parseFloat(v))&&isFinite(v)))h++;}return t>0&&h/t>0.85;};
   const uniq=k=>_.uniq(sample.map(r=>r[k]).filter(v=>v!=null&&v!=="")).length;
+  const rateOK=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;const p=parseRating(v);if(p!=null&&p>=0&&p<=10)h++;}return t>0&&h/t>0.8;};
   let dateCol=null,ratingCol=null,textCol=null,sentCol=null;const catCols=[];
   for(const k of keys){
     const l=k.toLowerCase();
     if(!dateCol&&/日期|時間|date|time/.test(l)&&isDate(k)){dateCol=k;continue;}
-    if(!ratingCol&&isNum(k)&&/評分|星|分數|rating|score|star/.test(l)){ratingCol=k;continue;}
+    if(!ratingCol&&/評分|星|分數|rating|score|star/.test(l)&&rateOK(k)){ratingCol=k;continue;}
     if(!sentCol&&/情緒|情感|sentiment/.test(l)){sentCol=k;continue;}
     if(!textCol&&/評論|內容|留言|comment|review|content|文字/.test(l)&&!isNum(k)){textCol=k;continue;}
   }
   if(!dateCol)for(const k of keys){if(![ratingCol,textCol].includes(k)&&isDate(k)){dateCol=k;break;}}
   if(!ratingCol)for(const k of keys){
     if([dateCol,textCol].includes(k))continue;
-    if(isNum(k)){const vs=sample.map(r=>parseFloat(r[k])).filter(v=>!isNaN(v));
-      if(vs.length&&_.min(vs)>=0&&_.max(vs)<=10&&uniq(k)<=11){ratingCol=k;break;}}
+    const raw=sample.map(r=>r[k]).filter(v=>v!=null&&v!=="");
+    if(!raw.length||raw.some(v=>String(v).length>8))continue;
+    const vs=raw.map(v=>parseRating(v)).filter(v=>v!=null);
+    if(vs.length/raw.length>0.85&&_.min(vs)>=0&&_.max(vs)<=10&&_.uniq(vs.map(v=>Math.round(v))).length<=11){ratingCol=k;break;}
   }
   for(const k of keys){
     if([dateCol,ratingCol,textCol,sentCol].includes(k))continue;
@@ -211,17 +229,23 @@ function parseWorkbook(buf){
       .filter(r=>Object.values(r).some(v=>v!=null&&v!==""));
     if(!cl.length){info.push({sheet:sn,count:0,mapped:null});continue;}
     const sc=detectSchema(cl);
+    let scale=1,note="";
+    if(sc.ratingCol){
+      const rv=cl.map(r=>parseRating(r[sc.ratingCol])).filter(v=>v!=null);
+      if(rv.length&&_.max(rv)>5&&_.max(rv)<=10){scale=2;note="(10分制→已換算5分制)";}
+    }
     for(const r of cl){
+      const rt=sc.ratingCol?parseRating(r[sc.ratingCol]):null;
       all.push({
         平台:sn,
         日期:sc.dateCol?parseDate(r[sc.dateCol]):null,
-        評分:sc.ratingCol!=null&&r[sc.ratingCol]!=null&&!isNaN(parseFloat(r[sc.ratingCol]))?parseFloat(r[sc.ratingCol]):null,
+        評分:rt!=null?+(rt/scale).toFixed(2):null,
         評論:sc.textCol?(r[sc.textCol]!=null?String(r[sc.textCol]):null):null,
         情緒:sc.sentCol?(r[sc.sentCol]!=null?String(r[sc.sentCol]):null):null,
         分類:sc.catCols[0]?(r[sc.catCols[0]]!=null?String(r[sc.catCols[0]]):null):null,
       });
     }
-    info.push({sheet:sn,count:cl.length,mapped:`評分←${sc.ratingCol||"✗"} · 日期←${sc.dateCol||"✗"} · 評論←${sc.textCol||"✗"}${sc.catCols[0]?` · 分類←${sc.catCols[0]}`:""}`});
+    info.push({sheet:sn,count:cl.length,mapped:`評分←${sc.ratingCol||"✗"}${note} · 日期←${sc.dateCol||"✗"} · 評論←${sc.textCol||"✗"}${sc.catCols[0]?` · 分類←${sc.catCols[0]}`:""}`});
   }
   if(!all.length)throw new Error("所有工作表皆無資料");
   return {all,info};
