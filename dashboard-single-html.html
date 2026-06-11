@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>跨平台評論智慧分析儀表板</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.21/lodash.min.js"></script>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#020617; color:#e2e8f0; font-family:"Segoe UI","Microsoft JhengHei",system-ui,sans-serif; min-height:100vh; }
+  .wrap { max-width:1200px; margin:0 auto; padding:20px 16px; }
+  .grad { background:linear-gradient(90deg,#818cf8,#c084fc,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  h1 { font-size:26px; }
+  .sub { color:#64748b; font-size:12px; margin-top:4px; }
+  .card { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:16px; margin-bottom:16px; }
+  .card h2 { font-size:14px; color:#cbd5e1; margin-bottom:12px; font-weight:600; }
+  .kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:16px; }
+  .kpi { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:14px; transition:.2s; }
+  .kpi:hover { border-color:#4f46e5; transform:translateY(-2px); }
+  .kpi .lb { color:#64748b; font-size:11px; margin-bottom:4px; }
+  .kpi .vl { font-size:22px; font-weight:700; }
+  .kpi .sb { font-size:10px; color:#475569; margin-top:2px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; border-bottom:1px solid #1e293b; padding-bottom:8px; margin-bottom:16px; }
+  .tab { background:none; border:none; color:#94a3b8; padding:8px 12px; border-radius:8px; cursor:pointer; font-size:14px; font-family:inherit; }
+  .tab:hover { background:#1e293b; color:#e2e8f0; }
+  .tab.on { background:#4f46e5; color:#fff; box-shadow:0 4px 14px rgba(79,70,229,.35); }
+  .filters { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:rgba(15,23,42,.6); border:1px solid #1e293b; border-radius:12px; padding:10px 12px; margin-bottom:14px; }
+  .filters label { font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:6px; }
+  select,input[type=text] { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:7px 10px; font-size:13px; font-family:inherit; outline:none; }
+  select:focus,input:focus { border-color:#6366f1; }
+  button.btn { background:#1e293b; border:1px solid #334155; color:#cbd5e1; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer; font-family:inherit; }
+  button.btn:hover { background:#334155; }
+  button.btn.danger.on { background:#dc2626; color:#fff; border-color:#dc2626; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:860px){ .grid2{grid-template-columns:1fr;} }
+  .chartbox { position:relative; height:260px; }
+  .chartbox.tall { height:300px; }
+  .insight { background:rgba(30,41,59,.5); border-left:3px solid #6366f1; border-radius:8px; padding:8px 12px; font-size:13px; color:#cbd5e1; margin-bottom:8px; }
+  .pcard { background:#0f172a; border:1px solid #1e293b; border-radius:14px; padding:14px; position:relative; overflow:hidden; }
+  .pcard .bar { position:absolute; top:0; left:0; right:0; height:3px; }
+  .pgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin-bottom:16px; }
+  .p3 { display:grid; grid-template-columns:1fr 1fr 1fr; text-align:center; margin-top:8px; }
+  .p3 .n { font-size:18px; font-weight:700; }
+  .p3 .t { font-size:10px; color:#64748b; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; color:#94a3b8; padding:8px; border-bottom:1px solid #334155; cursor:pointer; user-select:none; white-space:nowrap; }
+  th:hover { color:#818cf8; }
+  td { padding:8px; border-bottom:1px solid #1e293b; color:#cbd5e1; max-width:320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  tr:hover td { background:rgba(30,41,59,.5); }
+  tr.neg td { background:rgba(127,29,29,.15); }
+  .hm td { border-radius:6px; text-align:center; border-bottom:none; padding:8px 10px; }
+  .hm { border-collapse:separate; border-spacing:3px; }
+  .kwrow { display:flex; align-items:center; gap:8px; margin-bottom:8px; font-size:13px; }
+  .kwbar { flex:1; background:#1e293b; height:10px; border-radius:99px; overflow:hidden; }
+  .kwbar div { height:100%; border-radius:99px; }
+  .pager { display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:13px; color:#64748b; }
+  .empty { text-align:center; color:#64748b; padding:50px 20px; border:1px dashed #1e293b; border-radius:14px; background:rgba(15,23,42,.5); }
+  .grade { background:#0f172a; border:1px solid #334155; border-radius:12px; padding:6px 16px; text-align:center; }
+  .grade .g { font-size:24px; font-weight:900; }
+  .grade .t { font-size:10px; color:#64748b; }
+  .topbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
+  /* 上傳畫面 */
+  #upload { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
+  .upbox { max-width:560px; width:100%; text-align:center; }
+  .drop { border:2px dashed #334155; border-radius:18px; padding:50px 20px; cursor:pointer; background:rgba(15,23,42,.6); transition:.2s; margin-top:24px; }
+  .drop:hover,.drop.over { border-color:#6366f1; background:rgba(49,46,129,.25); }
+  .drop .ic { font-size:46px; margin-bottom:12px; }
+  .feat { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-top:24px; text-align:left; }
+  .feat div { background:rgba(15,23,42,.6); border:1px solid #1e293b; border-radius:12px; padding:10px; font-size:11px; color:#94a3b8; }
+  .feat b { display:block; color:#cbd5e1; font-size:12px; margin:4px 0 2px; }
+  .err { background:rgba(127,29,29,.4); border:1px solid #991b1b; color:#fca5a5; border-radius:12px; padding:12px; margin-top:14px; font-size:13px; text-align:left; }
+  .foot { text-align:center; color:#475569; font-size:11px; margin-top:24px; }
+  .sheetinfo { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:8px; }
+  .sheetinfo div { background:rgba(30,41,59,.5); border-radius:8px; padding:8px 10px; font-size:11px; color:#64748b; }
+  .sheetinfo b { color:#a5b4fc; }
+  .prio { display:flex; align-items:center; gap:10px; margin-bottom:8px; font-size:13px; }
+  .prio .rank { width:22px; text-align:center; font-weight:700; color:#64748b; }
+  .prio .nm { width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#cbd5e1; }
+  .prio .bar { flex:1; background:#1e293b; height:10px; border-radius:99px; overflow:hidden; }
+  .prio .bar div { height:100%; background:linear-gradient(90deg,#f59e0b,#ef4444); border-radius:99px; }
+  .prio .meta { width:140px; text-align:right; font-size:11px; color:#94a3b8; }
+</style>
+</head>
+<body>
+
+<!-- 上傳畫面 -->
+<div id="upload">
+  <div class="upbox">
+    <h1 class="grad">跨平台評論智慧分析儀表板</h1>
+    <p class="sub">上傳 Excel 評論資料(.xlsx / .xls)— 每個工作表視為一個平台來源,自動偵測欄位並產出分析</p>
+    <div class="drop" id="drop">
+      <div class="ic">📂</div>
+      <div style="font-size:17px;font-weight:600;" id="dropText">拖曳檔案到這裡,或點擊選擇檔案</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    <div id="upErr"></div>
+    <div class="feat">
+      <div>🌐<b>多平台合併</b>每個 sheet 自動標記為平台維度</div>
+      <div>🤖<b>自動偵測欄位</b>評分、日期、評論、分類免設定</div>
+      <div>🔒<b>資料不外傳</b>全程在你的瀏覽器內運算</div>
+    </div>
+  </div>
+</div>
+
+<!-- 儀表板 -->
+<div id="app" class="wrap" style="display:none">
+  <div class="topbar">
+    <div>
+      <h1 class="grad">跨平台評論智慧分析儀表板</h1>
+      <p class="sub" id="fileInfo"></p>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <button class="btn" onclick="resetApp()">📂 更換檔案</button>
+      <div class="grade" id="gradeBox" style="display:none">
+        <div class="t">口碑健康度</div>
+        <div class="g" id="gradeG"></div>
+        <div class="t" id="gradeD"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filters" id="filterBar"></div>
+  <div class="tabs" id="tabBar"></div>
+  <div id="content"></div>
+  <p class="foot">🔒 所有運算皆在瀏覽器本機完成,資料不會上傳到任何伺服器 · 每個工作表 = 一個平台來源</p>
+</div>
+
+<script>
+const COLORS=["#6366f1","#22c55e","#f59e0b","#ef4444","#06b6d4","#a855f7","#ec4899","#84cc16","#f97316","#14b8a6"];
+const WEEKDAYS=["週日","週一","週二","週三","週四","週五","週六"];
+const STOP=new Set(("的了,是在,我有,不人,都一,也很,到就,你會,可以,這個,那個,沒有,什麼,一個,我們,他們,還是,因為,所以,但是,如果,覺得,真的,非常,還有,就是,已經,而且,不過,然後,這樣,自己,時候,東西,使用,感覺,希望,購買,商品,產品,收到,以及,或者,的,了,是,在,我,有,不,人,都,一,也,很,到,就,你,和,與,跟,被,把,他,她,它,著,得,地,啊,吧,嗎,呢,喔,哦,但,而,又,再,還,只,個,等,讓,給,從,對,向,於,之,the,and,for,was,are,this,that,with,have,had,not,but,very").split(","));
+
+let rows=null, sheetInfo=[], fileName="";
+let tab="overview", fPlat="全部", fCat="全部", fRate="全部";
+let search="", page=0, sortKey=null, sortAsc=false;
+let charts=[];
+
+Chart.defaults.color="#94a3b8";
+Chart.defaults.borderColor="#1e293b";
+Chart.defaults.font.family='"Segoe UI","Microsoft JhengHei",sans-serif';
+
+// ---------- 工具 ----------
+function parseDate(v){
+  if(v instanceof Date) return isNaN(v)?null:v;
+  if(v==null||v==="") return null;
+  if(typeof v==="number"&&v>20000&&v<60000){const d=new Date(Math.round((v-25569)*86400*1000));return isNaN(d)?null:d;}
+  const s=String(v).replace(/年|\//g,"-").replace(/月/g,"-").replace(/日/g,"");
+  const d=new Date(s); return isNaN(d)?null:d;
+}
+const fmtMonth=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+function extractKeywords(texts,topN){
+  const freq={};
+  for(const t of texts){
+    const s=String(t||"");
+    (s.toLowerCase().match(/[a-z]{3,}/g)||[]).forEach(w=>{if(!STOP.has(w))freq[w]=(freq[w]||0)+1;});
+    (s.match(/[\u4e00-\u9fff]+/g)||[]).forEach(seg=>{
+      for(let n=2;n<=3;n++)for(let i=0;i+n<=seg.length;i++){
+        const g=seg.slice(i,i+n);
+        if(n===2&&(STOP.has(g)||(STOP.has(g[0])&&STOP.has(g[1]))))continue;
+        freq[g]=(freq[g]||0)+1;
+      }
+    });
+  }
+  const es=Object.entries(freq).filter(([,c])=>c>=2);
+  const longer=es.filter(([w])=>w.length>=3);
+  return es.filter(([w,c])=>w.length!==2||!longer.some(([lw,lc])=>lw.includes(w)&&lc>=c*0.8))
+    .sort((a,b)=>b[1]-a[1]).slice(0,topN).map(([word,count])=>({word,count}));
+}
+
+function detectSchema(data){
+  const keys=Object.keys(data[0]);
+  const sample=data.slice(0,200);
+  const isDate=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;if(parseDate(v))h++;}return t>0&&h/t>0.7;};
+  const isNum=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;if(typeof v==="number"||(!isNaN(parseFloat(v))&&isFinite(v)))h++;}return t>0&&h/t>0.85;};
+  const uniq=k=>_.uniq(sample.map(r=>r[k]).filter(v=>v!=null&&v!=="")).length;
+  let dateCol=null,ratingCol=null,textCol=null,sentCol=null;const catCols=[];
+  for(const k of keys){
+    const l=k.toLowerCase();
+    if(!dateCol&&/日期|時間|date|time/.test(l)&&isDate(k)){dateCol=k;continue;}
+    if(!ratingCol&&isNum(k)&&/評分|星|分數|rating|score|star/.test(l)){ratingCol=k;continue;}
+    if(!sentCol&&/情緒|情感|sentiment/.test(l)){sentCol=k;continue;}
+    if(!textCol&&/評論|內容|留言|comment|review|content|文字/.test(l)&&!isNum(k)){textCol=k;continue;}
+  }
+  if(!dateCol)for(const k of keys){if(![ratingCol,textCol].includes(k)&&isDate(k)){dateCol=k;break;}}
+  if(!ratingCol)for(const k of keys){
+    if([dateCol,textCol].includes(k))continue;
+    if(isNum(k)){const vs=sample.map(r=>parseFloat(r[k])).filter(v=>!isNaN(v));
+      if(vs.length&&_.min(vs)>=0&&_.max(vs)<=10&&uniq(k)<=11){ratingCol=k;break;}}
+  }
+  for(const k of keys){
+    if([dateCol,ratingCol,textCol,sentCol].includes(k))continue;
+    if(!isNum(k)&&!isDate(k)){const u=uniq(k);if(u>=2&&u<=30)catCols.push(k);}
+  }
+  if(!textCol){let best=null,bl=0;
+    for(const k of keys){if([dateCol,ratingCol,sentCol,...catCols].includes(k))continue;
+      const a=_.mean(sample.map(r=>String(r[k]??"").length));if(a>bl&&a>8){best=k;bl=a;}}
+    textCol=best;}
+  return {dateCol,ratingCol,textCol,sentCol,catCols};
+}
+
+function parseWorkbook(buf){
+  const wb=XLSX.read(buf,{type:"array",cellDates:true});
+  const all=[],info=[];
+  for(const sn of wb.SheetNames){
+    const raw=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:null});
+    const cl=raw.map(r=>{const o={};Object.keys(r).forEach(k=>o[String(k).trim()]=r[k]);return o;})
+      .filter(r=>Object.values(r).some(v=>v!=null&&v!==""));
+    if(!cl.length){info.push({sheet:sn,count:0,mapped:null});continue;}
+    const sc=detectSchema(cl);
+    for(const r of cl){
+      all.push({
+        平台:sn,
+        日期:sc.dateCol?parseDate(r[sc.dateCol]):null,
+        評分:sc.ratingCol!=null&&r[sc.ratingCol]!=null&&!isNaN(parseFloat(r[sc.ratingCol]))?parseFloat(r[sc.ratingCol]):null,
+        評論:sc.textCol?(r[sc.textCol]!=null?String(r[sc.textCol]):null):null,
+        情緒:sc.sentCol?(r[sc.sentCol]!=null?String(r[sc.sentCol]):null):null,
+        分類:sc.catCols[0]?(r[sc.catCols[0]]!=null?String(r[sc.catCols[0]]):null):null,
+      });
+    }
+    info.push({sheet:sn,count:cl.length,mapped:`評分←${sc.ratingCol||"✗"} · 日期←${sc.dateCol||"✗"} · 評論←${sc.textCol||"✗"}${sc.catCols[0]?` · 分類←${sc.catCols[0]}`:""}`});
+  }
+  if(!all.length)throw new Error("所有工作表皆無資料");
+  return {all,info};
+}
+
+// ---------- 上傳 ----------
+const drop=document.getElementById("drop"),fi=document.getElementById("fileInput");
+drop.onclick=()=>fi.click();
+drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");};
+drop.ondragleave=()=>drop.classList.remove("over");
+drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over");handleFile(e.dataTransfer.files[0]);};
+fi.onchange=e=>handleFile(e.target.files[0]);
+
+function handleFile(f){
+  if(!f)return;
+  document.getElementById("dropText").textContent="⏳ 解析中…";
+  document.getElementById("upErr").innerHTML="";
+  const rd=new FileReader();
+  rd.onload=e=>{
+    try{
+      const {all,info}=parseWorkbook(new Uint8Array(e.target.result));
+      rows=all;sheetInfo=info;fileName=f.name;
+      tab="overview";fPlat="全部";fCat="全部";fRate="全部";search="";page=0;sortKey=null;
+      document.getElementById("upload").style.display="none";
+      document.getElementById("app").style.display="block";
+      renderAll();
+    }catch(err){
+      document.getElementById("upErr").innerHTML='<div class="err">⚠️ 解析失敗:'+esc(err.message)+'</div>';
+    }
+    document.getElementById("dropText").textContent="拖曳檔案到這裡,或點擊選擇檔案";
+  };
+  rd.onerror=()=>{document.getElementById("upErr").innerHTML='<div class="err">⚠️ 檔案讀取失敗,請重試。</div>';};
+  rd.readAsArrayBuffer(f);
+}
+function resetApp(){
+  rows=null;fi.value="";
+  document.getElementById("app").style.display="none";
+  document.getElementById("upload").style.display="flex";
+}
+
+// ---------- 統計 ----------
+function getFiltered(){
+  let out=rows;
+  if(fPlat!=="全部")out=out.filter(r=>r.平台===fPlat);
+  if(fCat!=="全部")out=out.filter(r=>r.分類===fCat);
+  if(fRate!=="全部")out=out.filter(r=>{
+    if(r.評分==null)return false;
+    if(fRate==="好評(≥4)")return r.評分>=4;
+    if(fRate==="中評(3)")return r.評分>=3&&r.評分<4;
+    if(fRate==="負評(≤2)")return r.評分<=2;
+    return true;});
+  return out;
+}
+const platforms=()=>_.uniq(rows.map(r=>r.平台));
+const categories=()=>_.uniq(rows.map(r=>r.分類).filter(Boolean)).sort();
+
+function platStats(){
+  return platforms().map((p,i)=>{
+    const it=rows.filter(r=>r.平台===p);
+    const vs=it.map(r=>r.評分).filter(v=>v!=null);
+    const pos=vs.filter(v=>v>=4).length,neg=vs.filter(v=>v<=2).length;
+    return {平台:p,color:COLORS[i%COLORS.length],評論數:it.length,
+      平均評分:vs.length?+_.mean(vs).toFixed(2):null,
+      好評率:vs.length?+(pos/vs.length*100).toFixed(1):null,
+      負評率:vs.length?+(neg/vs.length*100).toFixed(1):null,
+      類NPS:vs.length?+((pos-neg)/vs.length*100).toFixed(0):null};
+  }).sort((a,b)=>(b.平均評分??0)-(a.平均評分??0));
+}
+
+function computeStats(){
+  const data=getFiltered(),total=data.length;
+  const s={total,insights:[]};
+  if(!total)return s;
+  const vals=data.map(r=>r.評分).filter(v=>v!=null);
+  if(vals.length){
+    s.avg=_.mean(vals);
+    const g=_.countBy(vals,v=>Math.round(v));
+    s.ratingDist=Object.keys(g).sort((a,b)=>a-b).map(k=>({star:k,count:g[k],pct:+(g[k]/vals.length*100).toFixed(1)}));
+    s.posRate=vals.filter(v=>v>=4).length/vals.length*100;
+    s.negRate=vals.filter(v=>v<=2).length/vals.length*100;
+    s.nps=s.posRate-s.negRate;
+    s.grade=s.nps>=70?{g:"A",c:"#4ade80",d:"優異"}:s.nps>=40?{g:"B",c:"#22d3ee",d:"良好"}:s.nps>=10?{g:"C",c:"#fbbf24",d:"待加強"}:{g:"D",c:"#f87171",d:"需警戒"};
+  }
+  const wd=data.filter(r=>r.日期);
+  if(wd.length){
+    const bm=_.groupBy(wd,r=>fmtMonth(r.日期));
+    s.trend=Object.keys(bm).sort().map(m=>{
+      const it=bm[m],vs=it.map(r=>r.評分).filter(v=>v!=null);
+      return {month:m,count:it.length,avg:vs.length?+_.mean(vs).toFixed(2):null,neg:vs.filter(v=>v<=2).length};
+    });
+    s.trend=s.trend.map((e,i)=>{
+      const win=s.trend.slice(Math.max(0,i-2),i+1).map(x=>x.avg).filter(v=>v!=null);
+      return {...e,ma:win.length?+_.mean(win).toFixed(2):null};
+    });
+    if(s.trend.length>=2){
+      const l=s.trend[s.trend.length-1],p=s.trend[s.trend.length-2];
+      if(l.avg!=null&&p.avg!=null)s.delta=+(l.avg-p.avg).toFixed(2);
+    }
+    const bw=_.groupBy(wd,r=>r.日期.getDay());
+    s.weekday=[0,1,2,3,4,5,6].map(d=>{
+      const it=bw[d]||[],vs=it.map(r=>r.評分).filter(v=>v!=null);
+      return {day:WEEKDAYS[d],count:it.length,avg:vs.length?+_.mean(vs).toFixed(2):null};
+    });
+  }
+  if(categories().length&&vals.length){
+    const gs=_.groupBy(data.filter(r=>r.分類),r=>r.分類);
+    s.catRating=Object.entries(gs).map(([name,it])=>{
+      const vs=it.map(r=>r.評分).filter(v=>v!=null);
+      const neg=vs.filter(v=>v<=2).length;
+      return {name,count:it.length,avg:vs.length?+_.mean(vs).toFixed(2):0,negRate:vs.length?+(neg/vs.length*100).toFixed(1):0};
+    }).sort((a,b)=>b.avg-a.avg);
+    s.priority=s.catRating.map(c=>({...c,score:+((c.negRate/100)*Math.log2(c.count+1)*10).toFixed(1)}))
+      .sort((a,b)=>b.score-a.score).slice(0,8);
+  }
+  if(vals.length){
+    const stars=_.uniq(vals.map(v=>Math.round(v))).sort((a,b)=>a-b);
+    const dim=fPlat==="全部"?"平台":"分類";
+    const gs=_.groupBy(data.filter(r=>r[dim]),r=>r[dim]);
+    if(Object.keys(gs).length>1){
+      s.heatmap={dim,stars,rows:Object.entries(gs).map(([name,it])=>{
+        const vs=it.map(r=>r.評分).filter(v=>v!=null);
+        const cn=_.countBy(vs,v=>Math.round(v));
+        return {name,total:it.length,cells:stars.map(st=>({star:st,count:cn[st]||0,pct:vs.length?(cn[st]||0)/vs.length:0}))};
+      }).sort((a,b)=>b.total-a.total).slice(0,12)};
+    }
+  }
+  const texts=data.map(r=>r.評論).filter(t=>t&&t.trim()!=="");
+  if(texts.length){
+    const lens=texts.map(t=>t.length);
+    s.avgLen=Math.round(_.mean(lens));
+    const bk=[[0,20],[21,50],[51,100],[101,200],[201,Infinity]];
+    s.lengthDist=bk.map(([lo,hi])=>({range:hi===Infinity?lo+"+ 字":lo+"-"+hi+" 字",count:lens.filter(l=>l>=lo&&l<=hi).length}));
+    if(vals.length){
+      s.posKw=extractKeywords(data.filter(r=>r.評分>=4).map(r=>r.評論),10);
+      s.negKw=extractKeywords(data.filter(r=>r.評分!=null&&r.評分<=2).map(r=>r.評論),10);
+    }else s.posKw=extractKeywords(texts,12);
+  }
+  // 洞察
+  const ps=platStats();
+  if(ps.length>1&&fPlat==="全部"){
+    const rated=ps.filter(p=>p.平均評分!=null);
+    if(rated.length>1){
+      const b=rated[0],w=rated[rated.length-1];
+      s.insights.push(`🏆 跨平台比較:「${b.平台}」口碑最佳(${b.平均評分} 分),「${w.平台}」最弱(${w.平均評分} 分,負評率 ${w.負評率}%),差距 ${(b.平均評分-w.平均評分).toFixed(2)} 分。`);
+      const mv=_.maxBy(ps,"評論數");
+      s.insights.push(`📣 聲量最大平台為「${mv.平台}」(${mv.評論數} 筆,佔 ${(mv.評論數/rows.length*100).toFixed(1)}%),是品牌形象主戰場。`);
+      const risky=rated.find(p=>p.負評率>=20);
+      if(risky)s.insights.push(`🚨 「${risky.平台}」負評率達 ${risky.負評率}%,建議優先安排該平台的評論回覆與客訴處理。`);
+    }
+  }
+  if(s.avg!=null)s.insights.push(`目前範圍:平均 ${s.avg.toFixed(2)} 分、好評率 ${s.posRate.toFixed(1)}%、健康度 ${s.grade.g}(${s.grade.d})。`);
+  if(s.delta!=null)s.insights.push(s.delta>=0?`📈 最近一個月平均評分較前月上升 ${s.delta} 分。`:`📉 最近一個月平均評分較前月下滑 ${Math.abs(s.delta)} 分,建議檢視近期負評。`);
+  if(s.priority&&s.priority[0]&&s.priority[0].score>0)s.insights.push(`🎯 改善優先序第一:「${s.priority[0].name}」(負評率 ${s.priority[0].negRate}% × ${s.priority[0].count} 筆)。`);
+  if(s.negKw&&s.negKw.length)s.insights.push(`負評高頻詞:${s.negKw.slice(0,5).map(k=>"「"+k.word+"」").join("、")}。`);
+  if(s.posKw&&s.posKw.length&&vals.length)s.insights.push(`好評高頻詞:${s.posKw.slice(0,5).map(k=>"「"+k.word+"」").join("、")} — 可作為行銷文案素材。`);
+  return s;
+}
+
+// ---------- 渲染 ----------
+const TABS=[["overview","📊 總覽"],["platform","🌐 平台比較"],["trend","📈 時間趨勢"],["cross","🔥 交叉熱力"],["text","💬 文字洞察"],["detail","📋 明細查詢"]];
+
+function renderAll(){
+  const f=getFiltered();
+  document.getElementById("fileInfo").textContent=
+    `📄 ${fileName} · ${platforms().length} 個平台(${platforms().join("、")})· 共 ${rows.length.toLocaleString()} 筆 · 篩選後 ${f.length.toLocaleString()} 筆`;
+  renderFilters();renderTabs();renderContent();
+}
+function renderFilters(){
+  const cats=categories();
+  let h=`<label>🌐 平台 <select onchange="fPlat=this.value;page=0;renderAll()">${["全部",...platforms()].map(p=>`<option ${p===fPlat?"selected":""}>${esc(p)}</option>`).join("")}</select></label>`;
+  if(cats.length)h+=`<label>🏷️ 分類 <select onchange="fCat=this.value;page=0;renderAll()">${["全部",...cats].map(c=>`<option ${c===fCat?"selected":""}>${esc(c)}</option>`).join("")}</select></label>`;
+  if(rows.some(r=>r.評分!=null))h+=`<label>⭐ 評分 <select onchange="fRate=this.value;page=0;renderAll()">${["全部","好評(≥4)","中評(3)","負評(≤2)"].map(c=>`<option ${c===fRate?"selected":""}>${c}</option>`).join("")}</select></label>`;
+  if(fPlat!=="全部"||fCat!=="全部"||fRate!=="全部")h+=`<button class="btn" onclick="fPlat='全部';fCat='全部';fRate='全部';page=0;renderAll()">✕ 清除篩選</button>`;
+  document.getElementById("filterBar").innerHTML=h;
+}
+function renderTabs(){
+  document.getElementById("tabBar").innerHTML=TABS.map(([id,lb])=>
+    `<button class="tab ${tab===id?"on":""}" onclick="tab='${id}';renderContent()">${lb}</button>`).join("");
+}
+function mkChart(id,cfg){const c=new Chart(document.getElementById(id),cfg);charts.push(c);return c;}
+function clearCharts(){charts.forEach(c=>c.destroy());charts=[];}
+
+function renderContent(){
+  clearCharts();
+  renderTabs();
+  const s=computeStats();
+  const gb=document.getElementById("gradeBox");
+  if(s.grade){gb.style.display="block";
+    document.getElementById("gradeG").textContent=s.grade.g;
+    document.getElementById("gradeG").style.color=s.grade.c;
+    document.getElementById("gradeD").textContent=s.grade.d;
+  }else gb.style.display="none";
+  const el=document.getElementById("content");
+  if(!s.total){el.innerHTML='<div class="empty">目前篩選條件下沒有資料。</div>';return;}
+  if(tab==="overview")renderOverview(el,s);
+  else if(tab==="platform")renderPlatform(el,s);
+  else if(tab==="trend")renderTrend(el,s);
+  else if(tab==="cross")renderCross(el,s);
+  else if(tab==="text")renderText(el,s);
+  else renderDetail(el,s);
+}
+
+function kpi(lb,vl,color,sub){return `<div class="kpi"><div class="lb">${lb}</div><div class="vl" style="color:${color}">${vl}</div>${sub?`<div class="sb">${sub}</div>`:""}</div>`;}
+
+function renderOverview(el,s){
+  let h='<div class="kpis">';
+  h+=kpi("🌐 平台數",platforms().length,"#22d3ee");
+  h+=kpi("💬 評論總數",s.total.toLocaleString(),"#818cf8");
+  if(s.avg!=null)h+=kpi("⭐ 平均評分",s.avg.toFixed(2),"#fbbf24");
+  if(s.posRate!=null)h+=kpi("👍 好評率(≥4★)",s.posRate.toFixed(1)+"%","#4ade80");
+  if(s.negRate!=null)h+=kpi("👎 負評率(≤2★)",s.negRate.toFixed(1)+"%","#f87171");
+  if(s.nps!=null)h+=kpi("🧭 類 NPS",s.nps.toFixed(0),"#22d3ee","好評率 − 負評率");
+  if(s.delta!=null)h+=kpi((s.delta>=0?"📈":"📉")+" 近月評分變化",(s.delta>=0?"+":"")+s.delta,s.delta>=0?"#4ade80":"#f87171");
+  if(s.avgLen!=null)h+=kpi("✍️ 平均評論長度",s.avgLen+" 字","#c084fc");
+  h+='</div>';
+  if(s.insights.length)h+=`<div class="card"><h2>🤖 自動洞察引擎</h2>${s.insights.map(i=>`<div class="insight">${esc(i)}</div>`).join("")}</div>`;
+  h+='<div class="grid2">';
+  if(s.ratingDist)h+='<div class="card"><h2>評分分布</h2><div class="chartbox"><canvas id="c1"></canvas></div></div>';
+  h+='<div class="card"><h2>各平台評論量佔比</h2><div class="chartbox"><canvas id="c2"></canvas></div></div></div>';
+  if(s.priority&&s.priority.length){
+    h+=`<div class="card"><h2>🎯 分類改善優先序(負評率 × 量體加權)</h2>${s.priority.map((p,i)=>
+      `<div class="prio"><span class="rank" style="color:${i===0?"#f87171":i===1?"#fbbf24":"#64748b"}">${i+1}</span><span class="nm">${esc(p.name)}</span><div class="bar"><div style="width:${Math.min(100,p.score/(s.priority[0].score||1)*100)}%"></div></div><span class="meta">負評 ${p.negRate}% · ${p.count} 筆</span></div>`).join("")}</div>`;
+  }
+  h+=`<div class="card"><h2>📑 工作表來源與欄位對應</h2><div class="sheetinfo">${sheetInfo.map(si=>
+    `<div><b>${esc(si.sheet)}</b> · ${si.count} 筆<br>${esc(si.mapped||"無資料")}</div>`).join("")}</div></div>`;
+  el.innerHTML=h;
+  if(s.ratingDist)mkChart("c1",{type:"bar",data:{labels:s.ratingDist.map(d=>d.star+"★"),
+    datasets:[{data:s.ratingDist.map(d=>d.count),backgroundColor:s.ratingDist.map(d=>+d.star<=2?"#ef4444":+d.star===3?"#f59e0b":"#22c55e"),borderRadius:6}]},
+    options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>c.parsed.y+" 筆("+s.ratingDist[c.dataIndex].pct+"%)"}}},maintainAspectRatio:false}});
+  const ps=platStats();
+  mkChart("c2",{type:"doughnut",data:{labels:ps.map(p=>p.平台),
+    datasets:[{data:ps.map(p=>p.評論數),backgroundColor:ps.map(p=>p.color),borderColor:"#0f172a",borderWidth:2}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{position:"right"}}}});
+}
+
+function renderPlatform(el){
+  const ps=platStats();
+  let h='<div class="pgrid">'+ps.map((p,i)=>
+    `<div class="pcard"><div class="bar" style="background:${p.color}"></div>
+    <div style="display:flex;justify-content:space-between;"><b>${i===0&&p.平均評分!=null?"👑 ":""}${esc(p.平台)}</b><span style="color:#64748b;font-size:11px">${p.評論數} 筆</span></div>
+    <div class="p3">
+      <div><div class="n" style="color:${p.平均評分>=4?"#4ade80":p.平均評分>=3?"#fbbf24":"#f87171"}">${p.平均評分??"—"}</div><div class="t">平均評分</div></div>
+      <div><div class="n" style="color:#4ade80">${p.好評率!=null?p.好評率+"%":"—"}</div><div class="t">好評率</div></div>
+      <div><div class="n" style="color:#f87171">${p.負評率!=null?p.負評率+"%":"—"}</div><div class="t">負評率</div></div>
+    </div></div>`).join("")+'</div>';
+  h+='<div class="grid2"><div class="card"><h2>各平台平均評分對比</h2><div class="chartbox"><canvas id="p1"></canvas></div></div>';
+  h+='<div class="card"><h2>各平台類 NPS 對比</h2><div class="chartbox"><canvas id="p2"></canvas></div></div></div>';
+  h+='<div class="card"><h2>各平台月平均評分走勢(口碑競賽圖)</h2><div class="chartbox tall"><canvas id="p3"></canvas></div></div>';
+  if(ps.filter(p=>p.平均評分!=null).length>=3)
+    h+='<div class="card"><h2>平台綜合雷達(標準化指標)</h2><div class="chartbox tall"><canvas id="p4"></canvas></div></div>';
+  el.innerHTML=h;
+  const rated=ps.filter(p=>p.平均評分!=null);
+  mkChart("p1",{type:"bar",data:{labels:rated.map(p=>p.平台),
+    datasets:[{data:rated.map(p=>p.平均評分),backgroundColor:rated.map(p=>p.color),borderRadius:6}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{min:0,max:5}}}});
+  mkChart("p2",{type:"bar",data:{labels:rated.map(p=>p.平台),
+    datasets:[{data:rated.map(p=>p.類NPS),backgroundColor:rated.map(p=>p.類NPS>=40?"#22c55e":p.類NPS>=0?"#f59e0b":"#ef4444"),borderRadius:6}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:-100,max:100}}}});
+  // 走勢
+  const wd=rows.filter(r=>r.日期&&r.評分!=null);
+  if(wd.length){
+    const months=_.uniq(wd.map(r=>fmtMonth(r.日期))).sort();
+    const topP=platforms().slice(0,6);
+    mkChart("p3",{type:"line",data:{labels:months,
+      datasets:topP.map((p,i)=>({label:p,data:months.map(m=>{
+        const vs=wd.filter(r=>r.平台===p&&fmtMonth(r.日期)===m).map(r=>r.評分);
+        return vs.length?+_.mean(vs).toFixed(2):null;}),
+        borderColor:COLORS[i%COLORS.length],backgroundColor:COLORS[i%COLORS.length],tension:.3,spanGaps:true,pointRadius:2}))},
+      options:{maintainAspectRatio:false,scales:{y:{min:0,max:5}}}});
+  }
+  if(rated.length>=3){
+    const maxC=Math.max(...ps.map(p=>p.評論數));
+    mkChart("p4",{type:"radar",data:{labels:["平均評分","好評率","低負評","聲量"],
+      datasets:ps.slice(0,5).map(p=>({label:p.平台,
+        data:[p.平均評分!=null?+(p.平均評分/5*100).toFixed(0):0,p.好評率??0,p.負評率!=null?+(100-p.負評率).toFixed(0):0,+(p.評論數/maxC*100).toFixed(0)],
+        borderColor:p.color,backgroundColor:p.color+"22",borderWidth:2}))},
+      options:{maintainAspectRatio:false,scales:{r:{min:0,max:100,grid:{color:"#1e293b"},angleLines:{color:"#1e293b"},pointLabels:{color:"#94a3b8"}}}}});
+  }
+}
+
+function renderTrend(el,s){
+  if(!s.trend||s.trend.length<2){el.innerHTML='<div class="empty">此資料未偵測到有效日期欄位,或時間範圍不足。</div>';return;}
+  let h='<div class="card"><h2>每月評論量與平均評分(含 3 月移動平均)</h2><div class="chartbox tall"><canvas id="t1"></canvas></div></div>';
+  h+='<div class="grid2"><div class="card"><h2>負評數量月趨勢(預警監控)</h2><div class="chartbox"><canvas id="t2"></canvas></div></div>';
+  h+='<div class="card"><h2>星期分布(客服排班參考)</h2><div class="chartbox"><canvas id="t3"></canvas></div></div></div>';
+  el.innerHTML=h;
+  const L=s.trend.map(t=>t.month);
+  mkChart("t1",{data:{labels:L,datasets:[
+    {type:"bar",label:"評論數",data:s.trend.map(t=>t.count),backgroundColor:"#6366f1cc",borderRadius:4,yAxisID:"y"},
+    {type:"line",label:"平均評分",data:s.trend.map(t=>t.avg),borderColor:"#f59e0b",tension:.3,yAxisID:"y2"},
+    {type:"line",label:"移動平均",data:s.trend.map(t=>t.ma),borderColor:"#22d3ee",borderDash:[6,3],pointRadius:0,tension:.3,yAxisID:"y2"}]},
+    options:{maintainAspectRatio:false,scales:{y:{position:"left"},y2:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}}}});
+  mkChart("t2",{type:"line",data:{labels:L,datasets:[{label:"負評數",data:s.trend.map(t=>t.neg),borderColor:"#ef4444",backgroundColor:"#ef444433",fill:true,tension:.3}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+  mkChart("t3",{data:{labels:s.weekday.map(w=>w.day),datasets:[
+    {type:"bar",label:"評論數",data:s.weekday.map(w=>w.count),backgroundColor:"#a855f7",borderRadius:4,yAxisID:"y"},
+    {type:"line",label:"平均評分",data:s.weekday.map(w=>w.avg),borderColor:"#f59e0b",tension:.3,yAxisID:"y2"}]},
+    options:{maintainAspectRatio:false,scales:{y:{position:"left"},y2:{position:"right",min:0,max:5,grid:{drawOnChartArea:false}}}}});
+}
+
+function renderCross(el,s){
+  if(!s.heatmap){el.innerHTML='<div class="empty">需具備評分欄位且維度值多於一個才能繪製熱力矩陣。</div>';return;}
+  const hm=s.heatmap;
+  let h=`<div class="card"><h2>${hm.dim} × 星等 熱力矩陣(顏色深淺 = 佔比)</h2><div style="overflow-x:auto"><table class="hm"><tr><th>${hm.dim}</th>${hm.stars.map(st=>`<th style="text-align:center">${st}★</th>`).join("")}<th style="text-align:right">合計</th></tr>`;
+  for(const r of hm.rows){
+    h+=`<tr><td style="white-space:nowrap;text-align:left">${esc(r.name)}</td>`;
+    for(const c of r.cells){
+      const base=c.star<=2?"239,68,68":c.star===3?"245,158,11":"34,197,94";
+      h+=`<td style="background:rgba(${base},${(0.12+c.pct*0.75).toFixed(2)});color:${c.pct>0.4?"#fff":"#cbd5e1"}" title="${esc(r.name)} ${c.star}★:${c.count} 筆(${(c.pct*100).toFixed(1)}%)">${c.count}</td>`;
+    }
+    h+=`<td style="text-align:right;color:#64748b">${r.total}</td></tr>`;
+  }
+  h+='</table></div><p style="font-size:11px;color:#64748b;margin-top:10px">💡 全部平台時顯示「平台 × 星等」;鎖定單一平台時自動切換為「分類 × 星等」。紅色深格 = 負評熱點。</p></div>';
+  el.innerHTML=h;
+}
+
+function kwBlock(title,data,color){
+  const max=data[0]?.count||1;
+  return `<div class="card"><h2>${title}</h2>${data.map((k,i)=>
+    `<div class="kwrow"><span style="width:20px;text-align:center;color:#64748b;font-size:11px">${i+1}</span><span style="width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(k.word)}</span><div class="kwbar"><div style="width:${(k.count/max*100).toFixed(0)}%;background:${color}"></div></div><span style="width:36px;text-align:right;color:#64748b;font-size:11px">${k.count}</span></div>`).join("")}</div>`;
+}
+function renderText(el,s){
+  let h="";
+  if(s.posKw||s.negKw){
+    h+='<div class="grid2">';
+    if(s.posKw&&s.posKw.length)h+=kwBlock("👍 好評高頻關鍵詞(行銷賣點素材)",s.posKw,"#22c55e");
+    if(s.negKw&&s.negKw.length)h+=kwBlock("👎 負評高頻關鍵詞(改善切入點)",s.negKw,"#ef4444");
+    h+='</div>';
+  }else h+='<div class="empty">未偵測到評論文字欄位。</div>';
+  if(s.lengthDist)h+='<div class="card"><h2>評論長度分布(投入程度指標)</h2><div class="chartbox"><canvas id="x1"></canvas></div></div>';
+  h+='<p style="font-size:11px;color:#475569">💡 提示:用上方「平台」篩選器切換,可比較不同平台的關鍵詞差異。</p>';
+  el.innerHTML=h;
+  if(s.lengthDist)mkChart("x1",{type:"bar",data:{labels:s.lengthDist.map(d=>d.range),
+    datasets:[{data:s.lengthDist.map(d=>d.count),backgroundColor:"#a855f7",borderRadius:6}]},
+    options:{maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+}
+
+function renderDetail(el){
+  const cats=categories();
+  const cols=["平台"];
+  if(rows.some(r=>r.日期))cols.push("日期");
+  if(cats.length)cols.push("分類");
+  if(rows.some(r=>r.評分!=null))cols.push("評分");
+  if(rows.some(r=>r.情緒))cols.push("情緒");
+  if(rows.some(r=>r.評論))cols.push("評論");
+  let out=getFiltered();
+  if(search.trim()){
+    const q=search.trim().toLowerCase();
+    out=out.filter(r=>cols.some(k=>String(r[k]??"").toLowerCase().includes(q)));
+  }
+  if(sortKey)out=_.orderBy(out,[r=>{const v=r[sortKey];if(v instanceof Date)return v.getTime();const n=parseFloat(v);return !isNaN(n)?n:String(v??"");}],[sortAsc?"asc":"desc"]);
+  const PS=10,pc=Math.max(1,Math.ceil(out.length/PS));
+  if(page>=pc)page=pc-1;
+  const pr=out.slice(page*PS,(page+1)*PS);
+  let h=`<div class="card"><h2>明細查詢(${out.length.toLocaleString()} 筆)</h2>
+  <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <input type="text" id="searchBox" placeholder="🔍 全欄位搜尋關鍵字…" value="${esc(search)}" style="flex:1;min-width:180px"
+      oninput="search=this.value;page=0;renderDetailOnly()">
+    <button class="btn danger ${fRate==="負評(≤2)"?"on":""}" onclick="fRate=fRate==='負評(≤2)'?'全部':'負評(≤2)';page=0;renderAll()">🚨 只看負評</button>
+  </div>
+  <div style="overflow-x:auto"><table><tr>${cols.map(c=>`<th onclick="if(sortKey==='${c}')sortAsc=!sortAsc;else{sortKey='${c}';sortAsc=false;}page=0;renderDetailOnly()">${c} ${sortKey===c?(sortAsc?"▲":"▼"):"⇅"}</th>`).join("")}</tr>`;
+  for(const r of pr){
+    h+=`<tr class="${r.評分!=null&&r.評分<=2?"neg":""}">${cols.map(k=>{
+      let v=r[k];if(v instanceof Date)v=v.toLocaleDateString();
+      return `<td title="${esc(v)}">${esc(v??"—")}</td>`;}).join("")}</tr>`;
+  }
+  h+=`</table></div>
+  <div class="pager">
+    <button class="btn" ${page===0?"disabled style='opacity:.3'":""} onclick="page--;renderDetailOnly()">← 上一頁</button>
+    <span>第 ${page+1} / ${pc} 頁</span>
+    <button class="btn" ${page>=pc-1?"disabled style='opacity:.3'":""} onclick="page++;renderDetailOnly()">下一頁 →</button>
+  </div></div>`;
+  el.innerHTML=h;
+  const sb=document.getElementById("searchBox");
+  if(sb){sb.focus();sb.setSelectionRange(sb.value.length,sb.value.length);}
+}
+function renderDetailOnly(){renderDetail(document.getElementById("content"));}
+</script>
+</body>
+</html>
