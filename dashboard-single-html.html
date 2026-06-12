@@ -28,7 +28,7 @@
   .tab.on { background:#4f46e5; color:#fff; box-shadow:0 4px 14px rgba(79,70,229,.35); }
   .filters { display:flex; flex-wrap:wrap; gap:10px; align-items:center; background:rgba(15,23,42,.6); border:1px solid #1e293b; border-radius:12px; padding:10px 12px; margin-bottom:14px; }
   .filters label { font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:6px; }
-  select,input[type=text] { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:7px 10px; font-size:13px; font-family:inherit; outline:none; }
+  select,input[type=text],input[type=date] { background:#1e293b; border:1px solid #334155; color:#e2e8f0; border-radius:8px; padding:7px 10px; font-size:13px; font-family:inherit; outline:none; color-scheme:dark; }
   select:focus,input:focus { border-color:#6366f1; }
   button.btn { background:#1e293b; border:1px solid #334155; color:#cbd5e1; border-radius:8px; padding:7px 12px; font-size:12px; cursor:pointer; font-family:inherit; }
   button.btn:hover { background:#334155; }
@@ -61,7 +61,6 @@
   .grade .g { font-size:24px; font-weight:900; }
   .grade .t { font-size:10px; color:#64748b; }
   .topbar { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
-  /* 上傳畫面 */
   #upload { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px; }
   .upbox { max-width:560px; width:100%; text-align:center; }
   .drop { border:2px dashed #334155; border-radius:18px; padding:50px 20px; cursor:pointer; background:rgba(15,23,42,.6); transition:.2s; margin-top:24px; }
@@ -80,12 +79,19 @@
   .prio .nm { width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#cbd5e1; }
   .prio .bar { flex:1; background:#1e293b; height:10px; border-radius:99px; overflow:hidden; }
   .prio .bar div { height:100%; background:linear-gradient(90deg,#f59e0b,#ef4444); border-radius:99px; }
-  .prio .meta { width:140px; text-align:right; font-size:11px; color:#94a3b8; }
+  .prio .meta { width:150px; text-align:right; font-size:11px; color:#94a3b8; }
+  .scen { background:rgba(30,41,59,.4); border:1px solid #1e293b; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+  .scen .head { display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
+  .scen .nm { font-weight:600; color:#e2e8f0; font-size:13px; }
+  .scen .ds { font-size:11px; color:#64748b; }
+  .scen .ct { font-size:12px; color:#f87171; font-weight:700; white-space:nowrap; }
+  .scen .bar { background:#1e293b; height:8px; border-radius:99px; overflow:hidden; margin-top:6px; }
+  .scen .bar div { height:100%; background:linear-gradient(90deg,#f97316,#ef4444); border-radius:99px; }
+  .scen .ex { font-size:11px; color:#94a3b8; margin-top:6px; font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 </style>
 </head>
 <body>
 
-<!-- 上傳畫面 -->
 <div id="upload">
   <div class="upbox">
     <h1 class="grad">跨平台評論智慧分析儀表板</h1>
@@ -97,14 +103,13 @@
     <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
     <div id="upErr"></div>
     <div class="feat">
-      <div>🌐<b>多平台合併</b>每個 sheet 自動標記為平台維度</div>
+      <div>🧭<b>意調表構面對應</b>內建公司 8 大構面欄位定義</div>
       <div>🤖<b>自動偵測欄位</b>評分、日期、評論、分類免設定</div>
       <div>🔒<b>資料不外傳</b>全程在你的瀏覽器內運算</div>
     </div>
   </div>
 </div>
 
-<!-- 儀表板 -->
 <div id="app" class="wrap" style="display:none">
   <div class="topbar">
     <div>
@@ -120,7 +125,6 @@
       </div>
     </div>
   </div>
-
   <div class="filters" id="filterBar"></div>
   <div class="tabs" id="tabBar"></div>
   <div id="content"></div>
@@ -132,8 +136,31 @@ const COLORS=["#6366f1","#22c55e","#f59e0b","#ef4444","#06b6d4","#a855f7","#ec48
 const WEEKDAYS=["週日","週一","週二","週三","週四","週五","週六"];
 const STOP=new Set(("的了,是在,我有,不人,都一,也很,到就,你會,可以,這個,那個,沒有,什麼,一個,我們,他們,還是,因為,所以,但是,如果,覺得,真的,非常,還有,就是,已經,而且,不過,然後,這樣,自己,時候,東西,使用,感覺,希望,購買,商品,產品,收到,以及,或者,的,了,是,在,我,有,不,人,都,一,也,很,到,就,你,和,與,跟,被,把,他,她,它,著,得,地,啊,吧,嗎,呢,喔,哦,但,而,又,再,還,只,個,等,讓,給,從,對,向,於,之,the,and,for,was,are,this,that,with,have,had,not,but,very").split(","));
 
+// ===== 公司意調表構面對應(可在此維護新欄位)=====
+const DIM_MAP={
+  "OR19_1":["整體","整體安排"],
+  "OR19_21":["行程","行程緊湊"],"OR19_22":["行程","行程導覽"],
+  "OR19_31":["餐食","餐食菜色"],"OR19_32":["餐食","餐食環境"],
+  "OR19_41":["飯店","飯店地點"],"OR19_42":["飯店","飯店整潔"],
+  "OR19_51":["交通","交通司機"],"OR19_52":["交通","交通安全"],
+  "OR19_61":["銷售","銷售服務"],"OR19_63":["銷售","銷售專業"],
+  "OR19_71":["領隊","領隊服務"],"OR19_72":["領隊","領隊專業"],
+  "OR19_81":["導遊","導遊服務"],"OR19_82":["導遊","導遊專業"],
+};
+const DIM_ORDER=["整體","行程","餐食","飯店","交通","銷售","領隊","導遊"];
+const dimOf=k=>DIM_MAP[String(k).trim().toUpperCase()]||null;
+
+// ===== 五大關鍵客訴情境定義 =====
+const SCENARIOS=[
+  ["🗺️ 行程安排","行程過趕、購物站過多、景點停留時間不足",["行程","太趕","緊湊","購物","景點","走馬看花","自費","時間不夠","趕行程","停留"]],
+  ["🍽️ 餐食品質","菜色重複、份量不足、口味不佳",["餐","菜色","難吃","食物","用餐","吃不飽","口味","菜","餐廳","份量"]],
+  ["🏨 住宿品質","房間整潔、設備老舊、隔音與熱水問題",["飯店","房間","住宿","髒","整潔","設備","隔音","熱水","老舊","床"]],
+  ["🚌 交通接駁","等車過久、班次延誤、司機與行車問題",["司機","交通","接送","誤點","延誤","等車","遊覽車","開車","班機","拉車"]],
+  ["🤝 服務態度","回覆慢、過度推銷、不專業、態度不佳",["態度","服務","領隊","導遊","客服","回覆","推銷","敷衍","專業","不理","兇"]],
+];
+
 let rows=null, sheetInfo=[], fileName="";
-let tab="overview", fPlat="全部", fCat="全部", fRate="全部";
+let tab="overview", fPlat="全部", fCat="全部", fRate="全部", fFrom="", fTo="";
 let search="", page=0, sortKey=null, sortAsc=false;
 let charts=[];
 
@@ -150,8 +177,8 @@ function parseDate(v){
   const d=new Date(s); return isNaN(d)?null:d;
 }
 const fmtMonth=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0");
+const fmtDateInput=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const esc=s=>String(s??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-// 萬用評分解析:支援 4、4.5、"4星"、"★★★★☆"、"4/5"、"8/10"、"4.5分"、"四星"
 function parseRating(v){
   if(v==null||v==="")return null;
   if(typeof v==="number")return isFinite(v)?v:null;
@@ -166,7 +193,6 @@ function parseRating(v){
   if(m)return parseFloat(m[0]);
   return null;
 }
-
 function extractKeywords(texts,topN){
   const freq={};
   for(const t of texts){
@@ -186,38 +212,50 @@ function extractKeywords(texts,topN){
     .sort((a,b)=>b[1]-a[1]).slice(0,topN).map(([word,count])=>({word,count}));
 }
 
-function detectSchema(data){
-  const keys=Object.keys(data[0]);
+function detectSchema(data,excludeKeys){
+  const ex=new Set(excludeKeys||[]);
+  const keys=Object.keys(data[0]).filter(k=>!ex.has(k));
   const sample=data.slice(0,200);
   const isDate=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;if(parseDate(v))h++;}return t>0&&h/t>0.7;};
   const isNum=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;if(typeof v==="number"||(!isNaN(parseFloat(v))&&isFinite(v)))h++;}return t>0&&h/t>0.85;};
   const uniq=k=>_.uniq(sample.map(r=>r[k]).filter(v=>v!=null&&v!=="")).length;
   const rateOK=k=>{let h=0,t=0;for(const r of sample){const v=r[k];if(v==null||v==="")continue;t++;const p=parseRating(v);if(p!=null&&p>=0&&p<=10)h++;}return t>0&&h/t>0.8;};
-  let dateCol=null,ratingCol=null,textCol=null,sentCol=null;const catCols=[];
+  let dateCol=null,ratingCol=null,textCol=null,sentCol=null,catNamed=null;
+  const catCols=[];
   for(const k of keys){
     const l=k.toLowerCase();
     if(!dateCol&&/日期|時間|date|time/.test(l)&&isDate(k)){dateCol=k;continue;}
     if(!ratingCol&&/評分|星|分數|rating|score|star/.test(l)&&rateOK(k)){ratingCol=k;continue;}
     if(!sentCol&&/情緒|情感|sentiment/.test(l)){sentCol=k;continue;}
+    if(!catNamed&&/分類|構面|類別|category|type|項目|主題/.test(l)&&!isNum(k)&&uniq(k)<=40){catNamed=k;continue;}
     if(!textCol&&/評論|內容|留言|comment|review|content|文字/.test(l)&&!isNum(k)){textCol=k;continue;}
   }
   if(!dateCol)for(const k of keys){if(![ratingCol,textCol].includes(k)&&isDate(k)){dateCol=k;break;}}
   if(!ratingCol)for(const k of keys){
-    if([dateCol,textCol].includes(k))continue;
+    if([dateCol,textCol,catNamed].includes(k))continue;
     const raw=sample.map(r=>r[k]).filter(v=>v!=null&&v!=="");
     if(!raw.length||raw.some(v=>String(v).length>8))continue;
     const vs=raw.map(v=>parseRating(v)).filter(v=>v!=null);
     if(vs.length/raw.length>0.85&&_.min(vs)>=0&&_.max(vs)<=10&&_.uniq(vs.map(v=>Math.round(v))).length<=11){ratingCol=k;break;}
   }
   for(const k of keys){
-    if([dateCol,ratingCol,textCol,sentCol].includes(k))continue;
+    if([dateCol,ratingCol,textCol,sentCol,catNamed].includes(k))continue;
     if(!isNum(k)&&!isDate(k)){const u=uniq(k);if(u>=2&&u<=30)catCols.push(k);}
   }
   if(!textCol){let best=null,bl=0;
-    for(const k of keys){if([dateCol,ratingCol,sentCol,...catCols].includes(k))continue;
+    for(const k of keys){if([dateCol,ratingCol,sentCol,catNamed,...catCols].includes(k))continue;
       const a=_.mean(sample.map(r=>String(r[k]??"").length));if(a>bl&&a>8){best=k;bl=a;}}
     textCol=best;}
-  return {dateCol,ratingCol,textCol,sentCol,catCols};
+  // 優先採用名稱明確的分類欄;否則退回啟發式
+  const catCol=catNamed||catCols[0]||null;
+  return {dateCol,ratingCol,textCol,sentCol,catCol};
+}
+
+// 分類值轉譯:若分類值本身是意調表欄位代碼,轉成構面
+function mapCatValue(v){
+  if(v==null)return null;
+  const d=dimOf(v);
+  return d?d[0]:String(v);
 }
 
 function parseWorkbook(buf){
@@ -228,6 +266,38 @@ function parseWorkbook(buf){
     const cl=raw.map(r=>{const o={};Object.keys(r).forEach(k=>o[String(k).trim()]=r[k]);return o;})
       .filter(r=>Object.values(r).some(v=>v!=null&&v!==""));
     if(!cl.length){info.push({sheet:sn,count:0,mapped:null});continue;}
+
+    // ===== 模式判斷:意調表(寬表)或一般評論表 =====
+    const surveyCols=Object.keys(cl[0]).filter(k=>dimOf(k));
+    if(surveyCols.length>=3){
+      // --- 意調表模式:每個構面欄位攤平為一筆評分紀錄 ---
+      const sc=detectSchema(cl,surveyCols);
+      let scale=1;
+      const allRv=[];
+      for(const r of cl)for(const k of surveyCols){const p=parseRating(r[k]);if(p!=null)allRv.push(p);}
+      let note="";
+      if(allRv.length&&_.max(allRv)>5&&_.max(allRv)<=10){scale=2;note="(10分制→已換算5分制)";}
+      let melted=0;
+      for(const r of cl){
+        const d=sc.dateCol?parseDate(r[sc.dateCol]):null;
+        const cm=sc.textCol&&r[sc.textCol]!=null?String(r[sc.textCol]):null;
+        let cmUsed=false;
+        for(const k of surveyCols){
+          const p=parseRating(r[k]);
+          if(p==null)continue;
+          const [dim,item]=dimOf(k);
+          const attach=!cmUsed&&(dim==="整體"||surveyCols.every(x=>{const dd=dimOf(x);return dd[0]!=="整體";}));
+          all.push({平台:sn,日期:d,評分:+(p/scale).toFixed(2),評論:attach?cm:null,情緒:null,分類:dim,次分類:item});
+          if(attach&&cm)cmUsed=true;
+          melted++;
+        }
+        if(!cmUsed&&cm){ all.push({平台:sn,日期:d,評分:null,評論:cm,情緒:null,分類:"整體",次分類:null}); }
+      }
+      info.push({sheet:sn,count:cl.length,mapped:`🧭 意調表模式:${cl.length} 筆回覆 → ${melted} 筆構面評分${note} · 對應 ${surveyCols.length} 個構面欄位 · 日期←${sc.dateCol||"✗"} · 評論←${sc.textCol||"✗"}`});
+      continue;
+    }
+
+    // --- 一般評論表模式 ---
     const sc=detectSchema(cl);
     let scale=1,note="";
     if(sc.ratingCol){
@@ -242,10 +312,11 @@ function parseWorkbook(buf){
         評分:rt!=null?+(rt/scale).toFixed(2):null,
         評論:sc.textCol?(r[sc.textCol]!=null?String(r[sc.textCol]):null):null,
         情緒:sc.sentCol?(r[sc.sentCol]!=null?String(r[sc.sentCol]):null):null,
-        分類:sc.catCols[0]?(r[sc.catCols[0]]!=null?String(r[sc.catCols[0]]):null):null,
+        分類:sc.catCol?mapCatValue(r[sc.catCol]):null,
+        次分類:null,
       });
     }
-    info.push({sheet:sn,count:cl.length,mapped:`評分←${sc.ratingCol||"✗"}${note} · 日期←${sc.dateCol||"✗"} · 評論←${sc.textCol||"✗"}${sc.catCols[0]?` · 分類←${sc.catCols[0]}`:""}`});
+    info.push({sheet:sn,count:cl.length,mapped:`評分←${sc.ratingCol||"✗"}${note} · 日期←${sc.dateCol||"✗"} · 評論←${sc.textCol||"✗"}${sc.catCol?` · 分類←${sc.catCol}`:""}`});
   }
   if(!all.length)throw new Error("所有工作表皆無資料");
   return {all,info};
@@ -268,7 +339,7 @@ function handleFile(f){
     try{
       const {all,info}=parseWorkbook(new Uint8Array(e.target.result));
       rows=all;sheetInfo=info;fileName=f.name;
-      tab="overview";fPlat="全部";fCat="全部";fRate="全部";search="";page=0;sortKey=null;
+      tab="overview";fPlat="全部";fCat="全部";fRate="全部";fFrom="";fTo="";search="";page=0;sortKey=null;
       document.getElementById("upload").style.display="none";
       document.getElementById("app").style.display="block";
       renderAll();
@@ -286,7 +357,7 @@ function resetApp(){
   document.getElementById("upload").style.display="flex";
 }
 
-// ---------- 統計 ----------
+// ---------- 篩選與統計 ----------
 function getFiltered(){
   let out=rows;
   if(fPlat!=="全部")out=out.filter(r=>r.平台===fPlat);
@@ -297,10 +368,21 @@ function getFiltered(){
     if(fRate==="中評(3)")return r.評分>=3&&r.評分<4;
     if(fRate==="負評(≤2)")return r.評分<=2;
     return true;});
+  if(fFrom){const d=new Date(fFrom);out=out.filter(r=>r.日期&&r.日期>=d);}
+  if(fTo){const d=new Date(fTo);d.setHours(23,59,59,999);out=out.filter(r=>r.日期&&r.日期<=d);}
   return out;
 }
 const platforms=()=>_.uniq(rows.map(r=>r.平台));
-const categories=()=>_.uniq(rows.map(r=>r.分類).filter(Boolean)).sort();
+function categories(){
+  const cs=_.uniq(rows.map(r=>r.分類).filter(Boolean));
+  // 構面優先依公司定義順序排,其餘按字母
+  return _.sortBy(cs,c=>{const i=DIM_ORDER.indexOf(c);return i===-1?100+c.charCodeAt(0):i;});
+}
+function dateRange(){
+  const ds=rows.map(r=>r.日期).filter(Boolean);
+  if(!ds.length)return null;
+  return {min:_.minBy(ds,d=>d.getTime()),max:_.maxBy(ds,d=>d.getTime())};
+}
 
 function platStats(){
   return platforms().map((p,i)=>{
@@ -313,6 +395,21 @@ function platStats(){
       負評率:vs.length?+(neg/vs.length*100).toFixed(1):null,
       類NPS:vs.length?+((pos-neg)/vs.length*100).toFixed(0):null};
   }).sort((a,b)=>(b.平均評分??0)-(a.平均評分??0));
+}
+
+function scenarioStats(data){
+  const withText=data.filter(r=>r.評論&&r.評論.trim()!=="");
+  if(!withText.length)return null;
+  const neg=withText.filter(r=>r.評分!=null&&r.評分<=2);
+  const pool=neg.length>=3?neg:withText;
+  const isNegPool=neg.length>=3;
+  const base=pool.length;
+  const res=SCENARIOS.map(([name,desc,kws])=>{
+    const hits=pool.filter(r=>kws.some(k=>r.評論.includes(k)));
+    return {name,desc,count:hits.length,pct:base?+(hits.length/base*100).toFixed(1):0,
+      sample:hits.length?hits[0].評論.slice(0,50):null};
+  }).sort((a,b)=>b.count-a.count);
+  return {res,base,isNegPool};
 }
 
 function computeStats(){
@@ -360,6 +457,14 @@ function computeStats(){
     s.priority=s.catRating.map(c=>({...c,score:+((c.negRate/100)*Math.log2(c.count+1)*10).toFixed(1)}))
       .sort((a,b)=>b.score-a.score).slice(0,8);
   }
+  // 次分類(構面細項)排行
+  if(data.some(r=>r.次分類)&&vals.length){
+    const gs=_.groupBy(data.filter(r=>r.次分類&&r.評分!=null),r=>r.次分類);
+    s.subRating=Object.entries(gs).map(([name,it])=>({
+      name,count:it.length,avg:+_.mean(it.map(r=>r.評分)).toFixed(2),
+      negRate:+(it.filter(r=>r.評分<=2).length/it.length*100).toFixed(1)
+    })).sort((a,b)=>a.avg-b.avg);
+  }
   if(vals.length){
     const stars=_.uniq(vals.map(v=>Math.round(v))).sort((a,b)=>a-b);
     const dim=fPlat==="全部"?"平台":"分類";
@@ -379,47 +484,71 @@ function computeStats(){
     const bk=[[0,20],[21,50],[51,100],[101,200],[201,Infinity]];
     s.lengthDist=bk.map(([lo,hi])=>({range:hi===Infinity?lo+"+ 字":lo+"-"+hi+" 字",count:lens.filter(l=>l>=lo&&l<=hi).length}));
     if(vals.length){
-      s.posKw=extractKeywords(data.filter(r=>r.評分>=4).map(r=>r.評論),10);
-      s.negKw=extractKeywords(data.filter(r=>r.評分!=null&&r.評分<=2).map(r=>r.評論),10);
+      s.posKw=extractKeywords(data.filter(r=>r.評分>=4&&r.評論).map(r=>r.評論),10);
+      s.negKw=extractKeywords(data.filter(r=>r.評分!=null&&r.評分<=2&&r.評論).map(r=>r.評論),10);
     }else s.posKw=extractKeywords(texts,12);
+    s.scenario=scenarioStats(data);
   }
-  // 洞察
+  // ===== 洞察引擎 =====
   const ps=platStats();
   if(ps.length>1&&fPlat==="全部"){
     const rated=ps.filter(p=>p.平均評分!=null);
     if(rated.length>1){
       const b=rated[0],w=rated[rated.length-1];
       s.insights.push(`🏆 跨平台比較:「${b.平台}」口碑最佳(${b.平均評分} 分),「${w.平台}」最弱(${w.平均評分} 分,負評率 ${w.負評率}%),差距 ${(b.平均評分-w.平均評分).toFixed(2)} 分。`);
-      const mv=_.maxBy(ps,"評論數");
-      s.insights.push(`📣 聲量最大平台為「${mv.平台}」(${mv.評論數} 筆,佔 ${(mv.評論數/rows.length*100).toFixed(1)}%),是品牌形象主戰場。`);
       const risky=rated.find(p=>p.負評率>=20);
       if(risky)s.insights.push(`🚨 「${risky.平台}」負評率達 ${risky.負評率}%,建議優先安排該平台的評論回覆與客訴處理。`);
     }
   }
   if(s.avg!=null)s.insights.push(`目前範圍:平均 ${s.avg.toFixed(2)} 分、好評率 ${s.posRate.toFixed(1)}%、健康度 ${s.grade.g}(${s.grade.d})。`);
   if(s.delta!=null)s.insights.push(s.delta>=0?`📈 最近一個月平均評分較前月上升 ${s.delta} 分。`:`📉 最近一個月平均評分較前月下滑 ${Math.abs(s.delta)} 分,建議檢視近期負評。`);
-  if(s.priority&&s.priority[0]&&s.priority[0].score>0)s.insights.push(`🎯 改善優先序第一:「${s.priority[0].name}」(負評率 ${s.priority[0].negRate}% × ${s.priority[0].count} 筆)。`);
+  if(s.catRating&&s.catRating.length>=2){
+    const w=s.catRating[s.catRating.length-1];
+    s.insights.push(`🧭 構面表現最弱:「${w.name}」(${w.avg} 分,負評率 ${w.negRate}%),為服務改善首選。`);
+  }
+  if(s.subRating&&s.subRating.length>=2){
+    s.insights.push(`📐 細項最低分:「${s.subRating[0].name}」(${s.subRating[0].avg} 分)、次低「${s.subRating[1].name}」(${s.subRating[1].avg} 分)。`);
+  }
+  if(s.scenario&&s.scenario.res[0]&&s.scenario.res[0].count>0){
+    const top=s.scenario.res.filter(x=>x.count>0).slice(0,3);
+    s.insights.push(`🚨 客訴情境排行:${top.map((t,i)=>`#${i+1} ${t.name}(${t.pct}%)`).join("、")} — 詳見下方五大客訴情境卡。`);
+  }
   if(s.negKw&&s.negKw.length)s.insights.push(`負評高頻詞:${s.negKw.slice(0,5).map(k=>"「"+k.word+"」").join("、")}。`);
   if(s.posKw&&s.posKw.length&&vals.length)s.insights.push(`好評高頻詞:${s.posKw.slice(0,5).map(k=>"「"+k.word+"」").join("、")} — 可作為行銷文案素材。`);
   return s;
 }
 
 // ---------- 渲染 ----------
-const TABS=[["overview","📊 總覽"],["platform","🌐 平台比較"],["trend","📈 時間趨勢"],["cross","🔥 交叉熱力"],["text","💬 文字洞察"],["detail","📋 明細查詢"]];
+const TABS=[["overview","📊 總覽"],["platform","🌐 平台比較"],["dim","🧭 構面分析"],["trend","📈 時間趨勢"],["cross","🔥 交叉熱力"],["text","💬 文字洞察"],["detail","📋 明細查詢"]];
 
 function renderAll(){
   const f=getFiltered();
   document.getElementById("fileInfo").textContent=
     `📄 ${fileName} · ${platforms().length} 個平台(${platforms().join("、")})· 共 ${rows.length.toLocaleString()} 筆 · 篩選後 ${f.length.toLocaleString()} 筆`;
-  renderFilters();renderTabs();renderContent();
+  renderFilters();renderContent();
 }
 function renderFilters(){
   const cats=categories();
   let h=`<label>🌐 平台 <select onchange="fPlat=this.value;page=0;renderAll()">${["全部",...platforms()].map(p=>`<option ${p===fPlat?"selected":""}>${esc(p)}</option>`).join("")}</select></label>`;
-  if(cats.length)h+=`<label>🏷️ 分類 <select onchange="fCat=this.value;page=0;renderAll()">${["全部",...cats].map(c=>`<option ${c===fCat?"selected":""}>${esc(c)}</option>`).join("")}</select></label>`;
+  if(cats.length)h+=`<label>🧭 構面/分類 <select onchange="fCat=this.value;page=0;renderAll()">${["全部",...cats].map(c=>`<option ${c===fCat?"selected":""}>${esc(c)}</option>`).join("")}</select></label>`;
   if(rows.some(r=>r.評分!=null))h+=`<label>⭐ 評分 <select onchange="fRate=this.value;page=0;renderAll()">${["全部","好評(≥4)","中評(3)","負評(≤2)"].map(c=>`<option ${c===fRate?"selected":""}>${c}</option>`).join("")}</select></label>`;
-  if(fPlat!=="全部"||fCat!=="全部"||fRate!=="全部")h+=`<button class="btn" onclick="fPlat='全部';fCat='全部';fRate='全部';page=0;renderAll()">✕ 清除篩選</button>`;
+  const dr=dateRange();
+  if(dr){
+    const mn=fmtDateInput(dr.min),mx=fmtDateInput(dr.max);
+    h+=`<label>📅 <input type="date" min="${mn}" max="${mx}" value="${fFrom}" onchange="fFrom=this.value;page=0;renderAll()"> ~ <input type="date" min="${mn}" max="${mx}" value="${fTo}" onchange="fTo=this.value;page=0;renderAll()"></label>`;
+    h+=`<span style="display:flex;gap:4px;">
+      <button class="btn" onclick="quickRange(30)">近30天</button>
+      <button class="btn" onclick="quickRange(90)">近90天</button>
+      <button class="btn" onclick="quickRange(365)">近一年</button></span>`;
+  }
+  if(fPlat!=="全部"||fCat!=="全部"||fRate!=="全部"||fFrom||fTo)
+    h+=`<button class="btn" onclick="fPlat='全部';fCat='全部';fRate='全部';fFrom='';fTo='';page=0;renderAll()">✕ 清除篩選</button>`;
   document.getElementById("filterBar").innerHTML=h;
+}
+function quickRange(days){
+  const dr=dateRange();if(!dr)return;
+  const end=dr.max,start=new Date(end.getTime()-days*86400000);
+  fFrom=fmtDateInput(start<dr.min?dr.min:start);fTo=fmtDateInput(end);page=0;renderAll();
 }
 function renderTabs(){
   document.getElementById("tabBar").innerHTML=TABS.map(([id,lb])=>
@@ -429,8 +558,7 @@ function mkChart(id,cfg){const c=new Chart(document.getElementById(id),cfg);char
 function clearCharts(){charts.forEach(c=>c.destroy());charts=[];}
 
 function renderContent(){
-  clearCharts();
-  renderTabs();
+  clearCharts();renderTabs();
   const s=computeStats();
   const gb=document.getElementById("gradeBox");
   if(s.grade){gb.style.display="block";
@@ -439,9 +567,10 @@ function renderContent(){
     document.getElementById("gradeD").textContent=s.grade.d;
   }else gb.style.display="none";
   const el=document.getElementById("content");
-  if(!s.total){el.innerHTML='<div class="empty">目前篩選條件下沒有資料。</div>';return;}
+  if(!s.total){el.innerHTML='<div class="empty">目前篩選條件下沒有資料,請調整篩選。</div>';return;}
   if(tab==="overview")renderOverview(el,s);
   else if(tab==="platform")renderPlatform(el,s);
+  else if(tab==="dim")renderDim(el,s);
   else if(tab==="trend")renderTrend(el,s);
   else if(tab==="cross")renderCross(el,s);
   else if(tab==="text")renderText(el,s);
@@ -450,10 +579,25 @@ function renderContent(){
 
 function kpi(lb,vl,color,sub){return `<div class="kpi"><div class="lb">${lb}</div><div class="vl" style="color:${color}">${vl}</div>${sub?`<div class="sb">${sub}</div>`:""}</div>`;}
 
+function scenarioCard(s){
+  if(!s.scenario)return "";
+  const {res,base,isNegPool}=s.scenario;
+  if(!res.some(x=>x.count>0))return "";
+  const max=res[0].count||1;
+  return `<div class="card"><h2>🚨 五大關鍵客訴情境(分析母體:${isNegPool?"負評":"全部含文字評論"} ${base} 筆)</h2>
+    ${res.map((x,i)=>`<div class="scen">
+      <div class="head"><span class="nm">#${i+1} ${x.name}</span><span class="ct">${x.count} 筆 · ${x.pct}%</span></div>
+      <div class="ds">${x.desc}</div>
+      <div class="bar"><div style="width:${(x.count/max*100).toFixed(0)}%"></div></div>
+      ${x.sample?`<div class="ex" title="${esc(x.sample)}">💬 範例:「${esc(x.sample)}…」</div>`:""}
+    </div>`).join("")}
+    <p style="font-size:11px;color:#475569;margin-top:6px">💡 以關鍵詞情境模型比對評論文字,一則評論可能同時命中多個情境。搭配日期篩選可追蹤各情境的改善成效。</p></div>`;
+}
+
 function renderOverview(el,s){
   let h='<div class="kpis">';
   h+=kpi("🌐 平台數",platforms().length,"#22d3ee");
-  h+=kpi("💬 評論總數",s.total.toLocaleString(),"#818cf8");
+  h+=kpi("💬 評論/評分筆數",s.total.toLocaleString(),"#818cf8");
   if(s.avg!=null)h+=kpi("⭐ 平均評分",s.avg.toFixed(2),"#fbbf24");
   if(s.posRate!=null)h+=kpi("👍 好評率(≥4★)",s.posRate.toFixed(1)+"%","#4ade80");
   if(s.negRate!=null)h+=kpi("👎 負評率(≤2★)",s.negRate.toFixed(1)+"%","#f87171");
@@ -462,12 +606,13 @@ function renderOverview(el,s){
   if(s.avgLen!=null)h+=kpi("✍️ 平均評論長度",s.avgLen+" 字","#c084fc");
   h+='</div>';
   if(s.insights.length)h+=`<div class="card"><h2>🤖 自動洞察引擎</h2>${s.insights.map(i=>`<div class="insight">${esc(i)}</div>`).join("")}</div>`;
+  h+=scenarioCard(s);
   h+='<div class="grid2">';
   if(s.ratingDist)h+='<div class="card"><h2>評分分布</h2><div class="chartbox"><canvas id="c1"></canvas></div></div>';
   h+='<div class="card"><h2>各平台評論量佔比</h2><div class="chartbox"><canvas id="c2"></canvas></div></div></div>';
   if(s.priority&&s.priority.length){
-    h+=`<div class="card"><h2>🎯 分類改善優先序(負評率 × 量體加權)</h2>${s.priority.map((p,i)=>
-      `<div class="prio"><span class="rank" style="color:${i===0?"#f87171":i===1?"#fbbf24":"#64748b"}">${i+1}</span><span class="nm">${esc(p.name)}</span><div class="bar"><div style="width:${Math.min(100,p.score/(s.priority[0].score||1)*100)}%"></div></div><span class="meta">負評 ${p.negRate}% · ${p.count} 筆</span></div>`).join("")}</div>`;
+    h+=`<div class="card"><h2>🎯 構面改善優先序(負評率 × 量體加權)</h2>${s.priority.map((p,i)=>
+      `<div class="prio"><span class="rank" style="color:${i===0?"#f87171":i===1?"#fbbf24":"#64748b"}">${i+1}</span><span class="nm">${esc(p.name)}</span><div class="bar"><div style="width:${Math.min(100,p.score/(s.priority[0].score||1)*100)}%"></div></div><span class="meta">負評 ${p.negRate}% · ${p.count} 筆 · ${p.avg} 分</span></div>`).join("")}</div>`;
   }
   h+=`<div class="card"><h2>📑 工作表來源與欄位對應</h2><div class="sheetinfo">${sheetInfo.map(si=>
     `<div><b>${esc(si.sheet)}</b> · ${si.count} 筆<br>${esc(si.mapped||"無資料")}</div>`).join("")}</div></div>`;
@@ -479,6 +624,33 @@ function renderOverview(el,s){
   mkChart("c2",{type:"doughnut",data:{labels:ps.map(p=>p.平台),
     datasets:[{data:ps.map(p=>p.評論數),backgroundColor:ps.map(p=>p.color),borderColor:"#0f172a",borderWidth:2}]},
     options:{maintainAspectRatio:false,plugins:{legend:{position:"right"}}}});
+}
+
+// ===== 構面分析(意調表專屬視角)=====
+function renderDim(el,s){
+  if(!s.catRating||!s.catRating.length){el.innerHTML='<div class="empty">目前範圍內沒有構面/分類評分資料。若你的意調表欄位代碼與內建對照表不同,請告知對照表以便更新。</div>';return;}
+  const sorted=[...s.catRating].sort((a,b)=>{const ia=DIM_ORDER.indexOf(a.name),ib=DIM_ORDER.indexOf(b.name);return (ia===-1?99:ia)-(ib===-1?99:ib);});
+  let h='<div class="grid2">';
+  h+='<div class="card"><h2>各構面平均評分</h2><div class="chartbox tall"><canvas id="d1"></canvas></div></div>';
+  h+='<div class="card"><h2>構面雷達圖(服務品質輪廓)</h2><div class="chartbox tall"><canvas id="d2"></canvas></div></div></div>';
+  if(s.subRating&&s.subRating.length){
+    const worst=s.subRating;
+    const mn=Math.min(...worst.map(w=>w.avg)),mx=Math.max(...worst.map(w=>w.avg));
+    h+=`<div class="card"><h2>📐 細項評分排行(由低至高 — 越上面越需要改善)</h2>${worst.map((w,i)=>{
+      const ratio=mx===mn?1:(w.avg-mn)/(mx-mn);
+      const color=w.avg>=4?"#22c55e":w.avg>=3?"#f59e0b":"#ef4444";
+      return `<div class="prio"><span class="rank" style="color:${i===0?"#f87171":i===1?"#fbbf24":"#64748b"}">${i+1}</span><span class="nm" style="width:140px">${esc(w.name)}</span><div class="bar"><div style="width:${(w.avg/5*100).toFixed(0)}%;background:${color}"></div></div><span class="meta">${w.avg} 分 · 負評 ${w.negRate}% · ${w.count} 筆</span></div>`;
+    }).join("")}</div>`;
+  }
+  h+='<div class="card"><h2>構面量化指標表</h2><div style="overflow-x:auto"><table><tr><th>構面</th><th style="text-align:right">筆數</th><th style="text-align:right">平均評分</th><th style="text-align:right">負評率</th></tr>'+
+    sorted.map(c=>`<tr><td>${esc(c.name)}</td><td style="text-align:right;color:#64748b">${c.count}</td><td style="text-align:right;font-weight:600;color:${c.avg>=4?"#4ade80":c.avg>=3?"#fbbf24":"#f87171"}">${c.avg}</td><td style="text-align:right;color:#94a3b8">${c.negRate}%</td></tr>`).join("")+'</table></div></div>';
+  el.innerHTML=h;
+  mkChart("d1",{type:"bar",data:{labels:sorted.map(c=>c.name),
+    datasets:[{data:sorted.map(c=>c.avg),backgroundColor:sorted.map(c=>c.avg>=4?"#22c55e":c.avg>=3?"#f59e0b":"#ef4444"),borderRadius:6}]},
+    options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:0,max:5}}}});
+  mkChart("d2",{type:"radar",data:{labels:sorted.map(c=>c.name),
+    datasets:[{label:"平均評分",data:sorted.map(c=>c.avg),borderColor:"#818cf8",backgroundColor:"#818cf833",borderWidth:2}]},
+    options:{maintainAspectRatio:false,scales:{r:{min:0,max:5,grid:{color:"#1e293b"},angleLines:{color:"#1e293b"},pointLabels:{color:"#94a3b8",font:{size:12}}}}}});
 }
 
 function renderPlatform(el){
@@ -504,7 +676,6 @@ function renderPlatform(el){
   mkChart("p2",{type:"bar",data:{labels:rated.map(p=>p.平台),
     datasets:[{data:rated.map(p=>p.類NPS),backgroundColor:rated.map(p=>p.類NPS>=40?"#22c55e":p.類NPS>=0?"#f59e0b":"#ef4444"),borderRadius:6}]},
     options:{indexAxis:"y",maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{min:-100,max:100}}}});
-  // 走勢
   const wd=rows.filter(r=>r.日期&&r.評分!=null);
   if(wd.length){
     const months=_.uniq(wd.map(r=>fmtMonth(r.日期))).sort();
@@ -558,7 +729,7 @@ function renderCross(el,s){
     }
     h+=`<td style="text-align:right;color:#64748b">${r.total}</td></tr>`;
   }
-  h+='</table></div><p style="font-size:11px;color:#64748b;margin-top:10px">💡 全部平台時顯示「平台 × 星等」;鎖定單一平台時自動切換為「分類 × 星等」。紅色深格 = 負評熱點。</p></div>';
+  h+='</table></div><p style="font-size:11px;color:#64748b;margin-top:10px">💡 全部平台時顯示「平台 × 星等」;鎖定單一平台時自動切換為「構面 × 星等」。紅色深格 = 負評熱點。</p></div>';
   el.innerHTML=h;
 }
 
@@ -569,14 +740,15 @@ function kwBlock(title,data,color){
 }
 function renderText(el,s){
   let h="";
+  if(s.scenario)h+=scenarioCard(s);
   if(s.posKw||s.negKw){
     h+='<div class="grid2">';
     if(s.posKw&&s.posKw.length)h+=kwBlock("👍 好評高頻關鍵詞(行銷賣點素材)",s.posKw,"#22c55e");
     if(s.negKw&&s.negKw.length)h+=kwBlock("👎 負評高頻關鍵詞(改善切入點)",s.negKw,"#ef4444");
     h+='</div>';
-  }else h+='<div class="empty">未偵測到評論文字欄位。</div>';
+  }else if(!s.scenario) h+='<div class="empty">未偵測到評論文字欄位。</div>';
   if(s.lengthDist)h+='<div class="card"><h2>評論長度分布(投入程度指標)</h2><div class="chartbox"><canvas id="x1"></canvas></div></div>';
-  h+='<p style="font-size:11px;color:#475569">💡 提示:用上方「平台」篩選器切換,可比較不同平台的關鍵詞差異。</p>';
+  h+='<p style="font-size:11px;color:#475569">💡 提示:用上方「平台」與「日期」篩選器切換,可比較不同平台、不同期間的客訴情境與關鍵詞差異。</p>';
   el.innerHTML=h;
   if(s.lengthDist)mkChart("x1",{type:"bar",data:{labels:s.lengthDist.map(d=>d.range),
     datasets:[{data:s.lengthDist.map(d=>d.count),backgroundColor:"#a855f7",borderRadius:6}]},
@@ -588,6 +760,7 @@ function renderDetail(el){
   const cols=["平台"];
   if(rows.some(r=>r.日期))cols.push("日期");
   if(cats.length)cols.push("分類");
+  if(rows.some(r=>r.次分類))cols.push("次分類");
   if(rows.some(r=>r.評分!=null))cols.push("評分");
   if(rows.some(r=>r.情緒))cols.push("情緒");
   if(rows.some(r=>r.評論))cols.push("評論");
